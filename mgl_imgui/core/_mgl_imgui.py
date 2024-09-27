@@ -193,7 +193,8 @@ class ModernGLBaseRenderer(BaseOpenGLRenderer):
         self.resize(*display_size)
 
     def register_texture(self, texture: mgl.Texture):
-        self._textures[texture.glo] = texture
+        if texture.glo not in self._textures:
+            self._textures[texture.glo] = texture
 
     def remove_texture(self, texture: mgl.Texture):
         del self._textures[texture.glo]
@@ -359,12 +360,9 @@ class ModernGLRenderer(ModernGLBaseRenderer, ModernGLRendererMixin):
         for value in self.REVERSE_KEY_MAP.values():
             self.io.key_map[value] = value
 
-    def process_inputs(self, runtime):
+    @staticmethod
+    def process_inputs(delta_time: float):
+        if delta_time <= 0.0:
+            delta_time = 1 / 1000
         io = imgui.get_io()
-
-        if self._gui_time:
-            io.delta_time = runtime - self._gui_time
-        else:
-            io.delta_time = 1. / 60.
-        if (io.delta_time <= 0.0): io.delta_time = 1. / 1000.
-        self._gui_time = runtime
+        io.delta_time = delta_time

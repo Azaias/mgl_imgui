@@ -3,17 +3,53 @@ import moderngl as mgl
 import sys
 from mgl_imgui import ModernGLImgui
 import imgui
+import time
+
+
+class HighResClock:
+    """ A wrapper for pygame.Clock that tracks delta_time with higher precision (in seconds). """
+
+    def __init__(self):
+        self._clock = pg.time.Clock()
+        self._current_time = 0.0
+        self.delta_time = 0.0
+
+    def start(self):
+        """ Start or initialize the clock """
+        self.delta_time = 0.0
+        self._current_time = time.perf_counter()
+
+    def tick(self, fps_cap: int = 0) -> float:
+        self._clock.tick(fps_cap)
+        curr_time = time.perf_counter()
+        self.delta_time = curr_time - self._current_time
+        self._current_time = curr_time
+        return self.delta_time
+
+    def get_fps(self) -> int:
+        return int(self._clock.get_fps())
 
 
 class App:
     window_size = (1024, 768)
 
     def __init__(self):
-        self._is_running = False
+        self.ctx: mgl.Context | None = None
         self.color = (0.0, 0.0, 0.0, 0.0)
+
+        # Using custom HighResClock class because delta_time needs high precision.
+        # If not, interaction with imgui widgets won't be correct at high fps values
+        self.clock = HighResClock()
+        self.delta_time = 0.0
+        self.time = 0.0
+
+        self._is_running = False
 
     def initialize(self):
         self.imgui = ModernGLImgui(self.ctx, self.window_size)
+
+    def update(self):
+        self.imgui.update(self.delta_time)
 
     def render(self):
         self.ctx.clear(color=self.color)
@@ -21,14 +57,14 @@ class App:
 
     def render_ui(self):
         imgui.new_frame()
-
+        #
         with imgui.begin("Example", False):
             r, g, b, a = self.color
             changed, values = imgui.drag_float4("color", r, g, b, a, 0.05, 0.0, 1.0)
             if changed:
                 r, g, b, a = values
                 self.color = (r, g, b, a)
-
+        #
         imgui.end_frame()
         self.imgui.render()
 
@@ -59,9 +95,10 @@ class App:
             self.handle_events()
             self.render()
             pg.display.flip()
-            self.delta_time = self.clock.tick(120) * 0.001
+            self.delta_time = self.clock.tick(120)
             self.time = pg.time.get_ticks() * 0.001
-            pg.display.set_caption(f'{int(self.clock.get_fps())}')
+            pg.display.set_caption(f'{self.clock.get_fps()}')
+        self.imgui.shutdown()
         pg.quit()
         sys.exit()
 
@@ -87,9 +124,9 @@ class App:
         self.ctx.blend_func = (mgl.SRC_ALPHA, mgl.ONE_MINUS_SRC_ALPHA)
         self.ctx.gc_mode = 'auto'
 
-        self.clock = pg.time.Clock()
         self.delta_time = 0.0
         self.time = 0.0
+        self.clock.start()
 
         self._is_running = True
 
